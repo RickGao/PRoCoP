@@ -11,12 +11,12 @@ import torch
 from torch.nn.functional import avg_pool2d, binary_cross_entropy_with_logits, softplus
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from model import ContextHotspotUNet, FCN, HotspotUNet, UNet
+from model import ContextHotspotUNet, FCN, HotspotUNet, SpatialContextHotspotUNet, UNet
 from ranking import layout_average_precisions, ranking_metrics, top5_counts
 
 
 MODELS = {'fcn': FCN, 'unet': UNet, 'unet-hotspot': HotspotUNet,
-          'unet-context': ContextHotspotUNet}
+          'unet-context': ContextHotspotUNet, 'unet-spatial': SpatialContextHotspotUNet}
 
 
 class Maps(Dataset):
@@ -77,6 +77,20 @@ def hard_negative_ranking_loss(logits, target, threshold):
     per_layout = cost.sum(dim=1) / positives.clamp_min(1)
     valid = (positives > 0) & (negatives > 0)
     return per_layout.masked_fill(~valid, 0).sum() / valid.sum().clamp_min(1)
+
+
+def soft_ap_loss(logits, target, threshold):
+    """Approximate pooled tile AP with triangular bins in descending score order."""
+    scores, labels = logits.flatten(), target.flatten()
+    if scores.numel() > 16384:
+        sample = torch.randint(scores.numel(), (16384,), device=scores.device)
+        scores, labels = scores[sample], labels[sample]
+    centers = torch.arange(31, -1, -1, dtype=scores.dtype, device=scores.device)
+    membership = (1 - (31 * scores.sigmoid()[:, None] - centers).abs()).clamp_min(0)
+    positive_mass = (membership * (labels >= threshold)[:, None]).sum(dim=0)
+    precision = positive_mass.cumsum(0) / membership.sum(dim=0).cumsum(0).clamp_min(1e-7)
+    # A batch with no hotspots contributes zero ranking loss.
+    return (positive_mass * (1 - precision)).sum() / positive_mass.sum().clamp_min(1)
 
 
 def spatial_correlation(prediction, label, *, variance_floor):
@@ -355,6 +369,8 @@ def main():
                    help='Weight of the per-layout Pearson loss on the regression map')
     p.add_argument('--ranking-loss-weight', type=float, default=0,
                    help='Weight of the hard-negative ranking loss for models with a hotspot head')
+    p.add_argument('--ap-loss-weight', type=float, default=0,
+                   help='Weight of the minibatch soft-histogram AP loss for a hotspot head')
     p.add_argument('--bottleneck-dilation', type=int, default=1,
                    help='Dilation of the second U-Net bottleneck convolution')
     p.add_argument('--flip-augment', action='store_true',
@@ -363,6 +379,8 @@ def main():
     p.add_argument('--batch-size', type=int, default=4)
     p.add_argument('--workers', type=int, default=0, help='Number of data loading workers')
     p.add_argument('--seed', type=int, default=42)
+    p.add_argument('--threshold-seed', type=int,
+                   help='Optional independent training-label sampling seed for matched multi-seed comparisons')
     p.add_argument('--lr', type=float, default=1e-4)
     p.add_argument('--device', default='auto', choices=['auto', 'cuda', 'mps', 'cpu'],
                    help='Compute device (default: try CUDA, then Metal/MPS, then CPU)')
@@ -408,12 +426,18 @@ def main():
     use_hotspot_head = issubclass(MODELS[args.model], HotspotUNet)
     if args.ranking_loss_weight and not use_hotspot_head:
         p.error('--ranking-loss-weight requires a model with a hotspot head')
+    if not np.isfinite(args.ap_loss_weight) or args.ap_loss_weight < 0:
+        p.error('--ap-loss-weight must be finite and nonnegative')
+    if args.ap_loss_weight and not use_hotspot_head:
+        p.error('--ap-loss-weight requires a model with a hotspot head')
     if args.bottleneck_dilation < 1 or (args.model == 'fcn' and args.bottleneck_dilation != 1):
         p.error('--bottleneck-dilation must be positive and is supported for U-Net only')
     if min(args.epochs, args.batch_size) < 1 or args.val_design == args.test_design:
         p.error('Require positive epochs and batch size and different validation/test designs')
     if args.workers < 0:
         p.error('--workers must be nonnegative')
+    if args.threshold_seed is not None and args.threshold_seed < 0:
+        p.error('--threshold-seed must be nonnegative')
     if args.out.exists():
         p.error('Output directory already exists; choose a new run directory')
     print(f'Training device: {args.device} (requested: {requested_device})',
@@ -431,7 +455,8 @@ def main():
     train = [r for r in rows if r['design'] not in (args.test_design, args.val_design)]
     if not all([train, val, test]):
         raise ValueError('Need nonempty training, validation and test designs')
-    threshold = training_hotspot_threshold(Maps(train, root), args.seed, show_progress=show_progress)
+    threshold_seed = args.seed if args.threshold_seed is None else args.threshold_seed
+    threshold = training_hotspot_threshold(Maps(train, root), threshold_seed, show_progress=show_progress)
     train_loader = make_loader(train, root, args.batch_size, args.device, args.workers,
                                shuffle=True, generator=torch.Generator().manual_seed(args.seed))
     val_loader = make_loader(val, root, args.batch_size, args.device, args.workers)
@@ -446,7 +471,7 @@ def main():
         model.to(memory_format=torch.channels_last)
     config.update(device_requested=requested_device,
                   data_root=str(root), threshold=threshold,
-                  hotspot_positive_weight=positive_weight, shuffle_seed=args.seed,
+                  hotspot_positive_weight=positive_weight, shuffle_seed=args.seed, threshold_seed=threshold_seed,
                   model_parameters=sum(parameter.numel() for parameter in model.parameters()),
                   split_counts=dict(train=len(train), val=len(val), test=len(test)),
                   train_designs=sorted({r['design'] for r in train}),
@@ -482,6 +507,8 @@ def main():
                         if args.ranking_loss_weight:
                             loss = loss + args.ranking_loss_weight * hard_negative_ranking_loss(
                                 logits, y, threshold)
+                        if args.ap_loss_weight:
+                            loss = loss + args.ap_loss_weight * soft_ap_loss(logits, y, threshold)
                     else:
                         prediction = model(x)
                         loss = weighted_mse(prediction, y, args.alpha, threshold)

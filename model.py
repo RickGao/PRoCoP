@@ -99,28 +99,48 @@ class HotspotUNet(UNet):
 class ContextHotspotUNet(HotspotUNet):
     """Condition both output heads on the surrounding placement demand."""
 
+    context_channels = 18
+
     def __init__(self, bottleneck_dilation=1):
         super().__init__(bottleneck_dilation=bottleneck_dilation)
         # Six summaries per input channel. The last layer starts at identity
         # modulation so the original two heads have the same initial predictions.
-        self.context = nn.Sequential(nn.Conv2d(18, 24, 3, padding=1), nn.LeakyReLU(.2),
+        self.context = nn.Sequential(nn.Conv2d(self.context_channels, 24, 3, padding=1), nn.LeakyReLU(.2),
                                      nn.Conv2d(24, 4, 1))
         nn.init.zeros_(self.context[-1].weight)
         nn.init.zeros_(self.context[-1].bias)
 
-    def forward(self, x):
-        features = self.decode(x)
-        local = F.avg_pool2d(x, 8)
+    def context_features(self, x, local):
         height, width = local.shape[-2:]
         regions = F.adaptive_avg_pool2d(local, (min(4, height), min(4, width)))
         regions = F.interpolate(regions, size=(height, width), mode='bilinear', align_corners=False)
         deviation, mean = torch.std_mean(x, dim=(-2, -1), correction=0, keepdim=True)
-        summaries = (local, regions, local.mean(-1, keepdim=True).expand_as(local),
-                     local.mean(-2, keepdim=True).expand_as(local), mean.expand_as(local),
-                     deviation.expand_as(local))
-        modulation = self.context(torch.cat(summaries, dim=1))
+        return (local, regions, local.mean(-1, keepdim=True).expand_as(local),
+                local.mean(-2, keepdim=True).expand_as(local), mean.expand_as(local),
+                deviation.expand_as(local))
+
+    def forward(self, x):
+        features = self.decode(x)
+        local = F.avg_pool2d(x, 8)
+        modulation = self.context(torch.cat(self.context_features(x, local), dim=1))
         modulation = F.interpolate(modulation, size=x.shape[-2:], mode='bilinear', align_corners=False)
         map_scale, map_bias, hotspot_scale, hotspot_bias = modulation.chunk(4, dim=1)
         congestion = (1 + map_scale.tanh()) * self.head[0](features) + map_bias
         logits = (1 + hotspot_scale.tanh()) * self.hotspot_head(features) + hotspot_bias
         return congestion.sigmoid(), logits
+
+
+class SpatialContextHotspotUNet(ContextHotspotUNet):
+    """Add distance to die edges and local placement variation to the context head."""
+
+    context_channels = 23
+
+    def context_features(self, x, local):
+        batch, _, height, width = local.shape
+        y = (torch.arange(height, device=x.device, dtype=x.dtype) + 0.5) / height
+        x_coord = (torch.arange(width, device=x.device, dtype=x.dtype) + 0.5) / width
+        distance_y = 2 * torch.minimum(y, 1 - y).view(1, 1, height, 1)
+        distance_x = 2 * torch.minimum(x_coord, 1 - x_coord).view(1, 1, 1, width)
+        variance = (F.avg_pool2d(x.square(), 8) - local.square()).clamp_min(1e-8)
+        return (*super().context_features(x, local), variance.sqrt(),
+                distance_y.expand(batch, 1, height, width), distance_x.expand(batch, 1, height, width))

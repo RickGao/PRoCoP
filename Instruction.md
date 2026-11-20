@@ -161,7 +161,7 @@ single-head and dual-head models see the same batch sequence for a given seed.
 `--model unet-context` adds local, regional, row, column and layout-wide demand
 summaries to both output heads. `--flip-augment` mirrors inputs and labels
 together during training and can also be used with the original U-Net.
-The latest study combines an independently flip-trained dual-head U-Net with
+The four-design study combines an independently flip-trained dual-head U-Net with
 the context model by averaging both congestion maps and both hotspot scores.
 The three-model comparison averages the context prediction with the previous
 ensemble. Its hotspot score weights are 50% context, 25% original dual-head,
@@ -179,6 +179,58 @@ The measured two-checkpoint alternative uses `--pearson`, `--context` and
 Pearson and two-thirds context and averages the two regression maps.
 [Four-design ablation and replay command](ITERATION_LOG.md#每个模型对融合的贡献)
 
+### Spatial features and hotspot ranking
+
+The spatial U-Net (`--model unet-spatial`) adds horizontal and vertical edge
+distances and three local standard deviations to the context branch. It takes
+the same three placement maps. Add `--ap-loss-weight 0.005` to train with
+a soft-histogram approximation of tile AP alongside the original losses.
+All validation and test reports use the exact ranking metric.
+
+Run the validation screen, six paired test folds, and the outer seed replication
+from the project root in the CUDA environment.
+
+```bash
+python run_spatial_study.py --stage screen
+python run_spatial_study.py --stage test
+python run_spatial_study.py --stage followup
+```
+
+The screen holds `RISCY-FPU-b` out and compares four alternatives using two
+validation designs. The test stage loads the selected recipe and applies each
+fold's own validation cutoff. It reuses the archived reference checkpoints
+when available and trains them from the full manifest on a fresh checkout.
+The follow-up compares the original and selected context checkpoints individually
+when the selected recipe changes the network. The replication changes the training seed to 43
+while keeping the training-label sampling seed at 42.
+For the selected spatial AP recipe, the follow-up also evaluates a fixed mean of
+the earlier and new ensembles, sharing their Pearson checkpoint across three network passes.
+It benchmarks RUDY, ordinary MSE FCN and single-head MSE U-Net on the same six folds.
+The resulting per-design scores and equal-design means are in
+`runs/spatial_refinement/comparison_with_baselines.csv`.
+Run `python run_spatial_study.py --stage all` for the entire experiment or
+`python run_spatial_study.py --stage report` to print the saved table immediately on CPU.
+[Study protocol and results](ITERATION_LOG.md#2026-11-19--空间特征与热点排序优化)
+
+To run the three-model predictor on the 1,248 held-out `RISCY-FPU-b` layouts
+using the trained checkpoints and their saved validation cutoff, use a fresh
+output filename.
+
+```bash
+python compare_hotspot_methods.py --device cuda --split test \
+  --pearson runs/spatial_refinement/selection_b_pearson \
+  --context runs/spatial_refinement/selection_b_context \
+  --spatial-ap runs/spatial_refinement/selection_b_spatial_ap \
+  --methods spatial_consensus \
+  --thresholds-from runs/spatial_refinement/consensus_RISCY-FPU-b_validation.json \
+  --out runs/replay_fpu_b_spatial_consensus.json
+```
+
+The terminal tables show hotspot ranking, map quality and thresholded detection.
+To view a saved comparison in the same format, run
+`python compare_hotspot_methods.py --show-results runs/spatial_refinement/consensus_RISCY-FPU-b_test.json`.
+Use `--raw` for one method name and its metrics JSON per line.
+
 `compare_hotspot_methods.py --split validation --calibrated` selects a score
 threshold per method using validation F1. Supply that report as
 `--split test --thresholds-from VALIDATION_JSON` to transfer the cutoffs.
@@ -188,6 +240,20 @@ evaluation commands, checkpoint paths and design-level comparison.
 [Iteration log](ITERATION_LOG.md#文献复查与新一轮全量实验) ·
 [Results by design](runs/context_study/comparison.csv) ·
 [Held-out comparison figure](runs/context_study/heldout_metrics.png)
+
+### All-method rankings
+
+From the project root, print the 21-method six-design hotspot leaderboard with
+`python rank_models.py`. Run `python rank_models.py --scope zero_b_joint` for the
+matched-fold Pearson ranking of local checkpoints and published results, or
+`python rank_models.py --scope all` for every ranked group. These commands read the saved
+`runs/rankings/rankings.csv` with the Python standard library.
+
+`python rank_models.py --stage all` uses the four-design archive and the spatial
+study as inputs, completes their missing two-fold comparisons on CUDA, replays
+the early checkpoints and exports the rankings. To rebuild only the CSVs from
+finished evaluations, use `python rank_models.py --stage export`.
+[Model and literature comparison](MODEL_COMPARISON.md)
 
 ## Experiment protocol
 

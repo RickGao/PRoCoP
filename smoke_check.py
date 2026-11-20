@@ -1,5 +1,6 @@
 """Mechanics-only synthetic checks, not a CircuitNet experiment."""
 import csv
+import json
 import subprocess
 import sys
 import tempfile
@@ -7,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from model import FCN
-from train import weighted_mse
+from train import soft_ap_loss, weighted_mse
 
 torch.set_num_threads(2)
 torch.manual_seed(42)
@@ -27,6 +28,16 @@ for _ in range(20):
     opt.zero_grad(); loss = (model(x)-target).square().mean(); loss.backward(); opt.step()
 final = (model(x)-target).square().mean().item()
 assert final < initial, (initial,final)
+
+# Positives at ranks 1 and 3 give AP (1 + 2/3) / 2 at the soft-bin centers.
+logits = torch.logit(torch.tensor([2., 8., 19., 27.]) / 31).requires_grad_()
+mask = torch.tensor([0., 1., 0., 1.])
+ap_loss = soft_ap_loss(logits, mask, .5)
+torch.testing.assert_close(ap_loss, torch.tensor(1/6), atol=1e-6, rtol=0)
+ap_loss.backward()
+assert torch.isfinite(logits.grad).all()
+assert soft_ap_loss(logits, torch.zeros_like(mask), .5).item() == 0
+
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp); rows=[]
     rng = np.random.default_rng(42)
@@ -43,4 +54,12 @@ with tempfile.TemporaryDirectory() as tmp:
                         '--manifest',str(root/'manifest.csv'),'--test-design','synthetic_A',
                         '--val-design','synthetic_B','--epochs','1','--alpha',str(alpha),
                         '--out',str(root/f'run_{alpha}')],check=True)
-print(f'PASS: shapes, gradients, alpha=0 equivalence, overfit ({initial:.4f} -> {final:.4f}), both end-to-end runs. SYNTHETIC ONLY.')
+    spatial_run = root / 'spatial'
+    subprocess.run([sys.executable, str(Path(__file__).with_name('train.py')),
+                    '--manifest', str(root / 'manifest.csv'), '--test-design', 'synthetic_A',
+                    '--val-design', 'synthetic_B', '--model', 'unet-spatial', '--ap-loss-weight', '0.005',
+                    '--device', 'cpu', '--epochs', '1', '--select-by', 'ap', '--no-progress',
+                    '--out', str(spatial_run)], check=True)
+    metrics = json.loads((spatial_run / 'test_metrics.json').read_text())
+    assert metrics['ranking_score'] == 'hotspot_probability' and 0 <= metrics['ap'] <= 1
+print(f'PASS: synthetic FCN and spatial training, AP loss and overfit ({initial:.4f} -> {final:.4f}).')
