@@ -1,44 +1,46 @@
 # CircuitNet-N28 布局阶段拥塞预测模型对照
 
-**按项目主目标，新三模型（Pearson + 原上下文 + 空间 AP）排第一。** 21 种本地正式方案使用同一份 10,242 布局的清单。按清单中的 6 个设计名做留一测试，每一折的测试电路都未参与该折训练。第一名的整折热点 AP 为 **0.28353**，第二名是 Pearson 双头与空间 AP 上下文的双模型融合，AP 为 0.28106，差 0.00247。只做一次网络前向时，上下文双头 U-Net 最高（0.27982）。[总排名](runs/rankings/rankings.csv) · [126 个逐折测试结果](runs/rankings/local_per_design.csv)
+**按项目主目标，新三模型（Pearson + 原上下文 + 空间 AP）排第一。** 21 种本地正式方案使用同一份 10,242 布局的清单。按清单中的 6 个设计名做留一测试，每一折的测试电路都未参与该折训练。第一名的整折热点 AP 为 **0.28353**，第二名是 Pearson 双头与空间 AP 上下文的双模型融合，AP 为 0.28106，差 0.00247。只做一次网络前向时，上下文双头 U-Net 最高（0.27982）。[总排名](../runs/rankings/rankings.csv) · [126 个逐折测试结果](../runs/rankings/local_per_design.csv)
 
 与公开方法能对齐的是 `zero-riscy-b` 的 1,122 份测试布局。按全图 Pearson 排，**十通道 CLDRoute 排第一（0.36870）**，本地的翻转增强双头与上下文融合排第二（0.36106）。本地六折热点冠军在这张 Pearson 榜排第 3（0.35162）。这篇论文公布了该折的回归与空间相关指标，同定义热点 AP 的差距仍未知。[CLDRoute 表 9、10](https://arxiv.org/html/2607.16674v1#S5.SS2)
 
 ## 21 种正式方案的六折热点排名
 
+三通道输入是 Macro Region、RUDY 和 Pin RUDY。表中的“双头”指一个网络分别输出连续拥塞图和热点分数图。“Pearson”指训练时鼓励预测图与标签的空间起伏一致。多网络融合在推理时逐格组合各网络的预测。[网络实现](../model.py) · [损失函数](../train.py) · [融合实现](../compare_hotspot_methods.py)
+
 每次留一个完整电路测试，六个电路的最终权重各为 1/6。AP 衡量真实热点在预测排序中有多靠前，排序使用连续分数。报警 F1 则使用该折验证集选出的固定预测阈值。主实验使用 seed 42。各指标保留五位小数后排位，同分并列。旧三模型的“仅调回归”版本沿用固定版本的热点分数，两者的 AP 完全相同。原四折列为 7,025 份布局的历史对照。
 
-| 六折 AP 名次 | 模型 | 六折 AP ↑ | 原四折 AP ↑ | 六折布局内 AP ↑ | 六折 MAE ↓ | 六折 Pearson ↑ | 六折报警 F1 ↑ |
-|---|---|---|---|---|---|---|---|
-| 1 | 新三模型（Pearson + 原上下文 + 空间 AP） | 0.28353 | 0.28514 | 0.32243 | 0.03407 | 0.50141 | 31.94% |
-| 2 | Pearson 双头 + 空间 AP 上下文 | 0.28106 | 0.28201 | 0.31653 | 0.03432 | 0.49808 | 31.92% |
-| 3 | 原双模型（Pearson + 原上下文） | 0.28092 | 0.28343 | 0.32090 | 0.03400 | 0.49680 | 31.89% |
-| 4 | 上下文双头 U-Net | 0.27982 | 0.28152 | 0.31848 | 0.03437 | 0.48554 | 32.27% |
-| 5 | 旧三模型（仅调回归权重） | 0.27930 | 0.28268 | 0.31734 | 0.03395 | 0.49646 | 31.66% |
-| 5 | 旧三模型（固定权重） | 0.27930 | 0.28268 | 0.31734 | 0.03400 | 0.49680 | 31.66% |
-| 7 | 空间 AP 上下文双头 | 0.27849 | 0.27789 | 0.31147 | 0.03515 | 0.48496 | 32.03% |
-| 8 | 旧三模型（验证集调热点和回归权重） | 0.27840 | 0.28045 | 0.31708 | 0.03395 | 0.49646 | 31.80% |
-| 9 | 普通双头 + 上下文 | 0.27833 | 0.28111 | 0.31363 | 0.03437 | 0.48554 | 31.95% |
-| 10 | 上下文双头 + 四视图推理 | 0.27757 | 0.27935 | 0.31470 | 0.03433 | 0.48863 | 31.70% |
-| 11 | 翻转增强双头 + 上下文 | 0.27741 | 0.28019 | 0.32080 | 0.03400 | 0.50168 | 31.61% |
-| 12 | 普通双头 + Pearson 双头 | 0.26980 | 0.27398 | 0.30389 | 0.03434 | 0.48357 | 31.00% |
-| 13 | Pearson 双头 U-Net | 0.26944 | 0.27301 | 0.30673 | 0.03434 | 0.48357 | 31.76% |
-| 14 | Pearson 双头 + 四视图推理 | 0.26764 | 0.27000 | 0.30628 | 0.03444 | 0.49042 | 30.96% |
-| 15 | Pearson 双头 + RUDY 分数 | 0.26506 | 0.26912 | 0.29905 | 0.03434 | 0.48357 | 31.71% |
-| 16 | 翻转增强训练的 Pearson 双头 | 0.26491 | 0.26782 | 0.30897 | 0.03433 | 0.48237 | 31.04% |
-| 17 | 单头 U-Net（普通 MSE） | 0.26122 | 0.26464 | 0.28738 | 0.03425 | 0.45764 | 30.52% |
-| 18 | 普通双头 U-Net | 0.25985 | 0.26225 | 0.29085 | 0.03449 | 0.43348 | 30.96% |
-| 19 | FCN（普通 MSE） | 0.25827 | 0.25599 | 0.27824 | 0.03448 | 0.41484 | 31.42% |
-| 20 | Pearson 双头 + 难负例排序 | 0.25564 | 0.25864 | 0.30856 | 0.03536 | 0.49330 | 32.75% |
-| 21 | RUDY | 0.19842 | 0.19565 | 0.22701 | 0.11570 | 0.36014 | 28.83% |
+| 六折 AP 名次 | 模型 | 每种方案怎么做 | 六折 AP ↑ | 原四折 AP ↑ | 六折布局内 AP ↑ | 六折 MAE ↓ | 六折 Pearson ↑ | 六折报警 F1 ↑ |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 新三模型（Pearson + 原上下文 + 空间 AP） | Pearson、上下文、空间 AP 三个网络各给 1/3 热点概率。拥塞图按同一顺序取 1/2、1/4、1/4。 | 0.28353 | 0.28514 | 0.32243 | 0.03407 | 0.50141 | 31.94% |
+| 2 | Pearson 双头 + 空间 AP 上下文 | 热点分数取 1/3 Pearson、2/3 空间 AP 分支。拥塞图取两者平均。 | 0.28106 | 0.28201 | 0.31653 | 0.03432 | 0.49808 | 31.92% |
+| 3 | 原双模型（Pearson + 原上下文） | 热点分数取 1/3 Pearson、2/3 上下文。拥塞图取两者平均。 | 0.28092 | 0.28343 | 0.32090 | 0.03400 | 0.49680 | 31.89% |
+| 4 | 上下文双头 U-Net | 给 Pearson 双头加入 8×8 邻域、4×4 分区、行、列和全图统计，逐位置调节两个头的输出。 | 0.27982 | 0.28152 | 0.31848 | 0.03437 | 0.48554 | 32.27% |
+| 5 | 旧三模型（仅调回归权重） | 沿用旧三模型的热点配比，在验证集按 MAE 选择 Pearson 与上下文两张拥塞图的权重。 | 0.27930 | 0.28268 | 0.31734 | 0.03395 | 0.49646 | 31.66% |
+| 5 | 旧三模型（固定权重） | 热点概率按普通双头 25%、Pearson 25%、上下文 50% 混合。拥塞图取后两者平均。 | 0.27930 | 0.28268 | 0.31734 | 0.03400 | 0.49680 | 31.66% |
+| 7 | 空间 AP 上下文双头 | 在上下文网络中加入到芯片边缘的距离、邻域标准差，并用近似 AP 损失训练热点头。 | 0.27849 | 0.27789 | 0.31147 | 0.03515 | 0.48496 | 32.03% |
+| 8 | 旧三模型（验证集调热点和回归权重） | 旧三模型在每折验证集按 AP 选热点权重、按 MAE 选拥塞图权重，随后固定两组权重。 | 0.27840 | 0.28045 | 0.31708 | 0.03395 | 0.49646 | 31.80% |
+| 9 | 普通双头 + 上下文 | 普通双头和上下文的热点概率按 1:2 混合。拥塞图取自上下文网络。 | 0.27833 | 0.28111 | 0.31363 | 0.03437 | 0.48554 | 31.95% |
+| 10 | 上下文双头 + 四视图推理 | 上下文网络分别预测原图及水平、垂直、双向翻转图，恢复原坐标后平均两种输出。 | 0.27757 | 0.27935 | 0.31470 | 0.03433 | 0.48863 | 31.70% |
+| 11 | 翻转增强双头 + 上下文 | 把翻转增强训练的 Pearson 网络与上下文网络各运行一次，两张拥塞图和两张热点概率图分别平均。 | 0.27741 | 0.28019 | 0.32080 | 0.03400 | 0.50168 | 31.61% |
+| 12 | 普通双头 + Pearson 双头 | 平均普通双头与 Pearson 双头的热点概率，拥塞图取自 Pearson 网络。 | 0.26980 | 0.27398 | 0.30389 | 0.03434 | 0.48357 | 31.00% |
+| 13 | Pearson 双头 U-Net | 在普通双头的损失上加入 0.005 × (1 − 布局内 Pearson 相关系数)，鼓励预测图和真实图在相同位置起伏。 | 0.26944 | 0.27301 | 0.30673 | 0.03434 | 0.48357 | 31.76% |
+| 14 | Pearson 双头 + 四视图推理 | 用同一个 Pearson 网络预测原图及三种翻转图，在原坐标中平均四次预测。 | 0.26764 | 0.27000 | 0.30628 | 0.03444 | 0.49042 | 30.96% |
+| 15 | Pearson 双头 + RUDY 分数 | 逐布局将 RUDY 对齐到热点分类分数的均值和标准差，按 25% RUDY、75% Pearson 分类分数混合后转为概率。 | 0.26506 | 0.26912 | 0.29905 | 0.03434 | 0.48357 | 31.71% |
+| 16 | 翻转增强训练的 Pearson 双头 | 训练 Pearson 网络时同步随机翻转布局与标签，测试时直接预测原图。 | 0.26491 | 0.26782 | 0.30897 | 0.03433 | 0.48237 | 31.04% |
+| 17 | 单头 U-Net（普通 MSE） | 用三个分辨率的跳跃连接将编码特征送入解码器，以 MSE 学一张拥塞图，按预测拥塞值排序。 | 0.26122 | 0.26464 | 0.28738 | 0.03425 | 0.45764 | 30.52% |
+| 18 | 普通双头 U-Net | 共享 U-Net 解码器，一个头用 MSE 学拥塞值，另一个头用加权二元交叉熵学热点概率。 | 0.25985 | 0.26225 | 0.29085 | 0.03449 | 0.43348 | 30.96% |
+| 19 | FCN（普通 MSE） | 对三通道输入做两次池化，再上采样并融合浅层特征，用 MSE 逐格预测拥塞值。 | 0.25827 | 0.25599 | 0.27824 | 0.03448 | 0.41484 | 31.42% |
+| 20 | Pearson 双头 + 难负例排序 | 在 Pearson 训练中额外惩罚真实热点得分低于高分负例平均值的情形，重点纠正误报。 | 0.25564 | 0.25864 | 0.30856 | 0.03536 | 0.49330 | 32.75% |
+| 21 | RUDY | 直接用输入中的 RUDY 布线需求估计图作为拥塞图及热点分数，无需训练。 | 0.19842 | 0.19565 | 0.22701 | 0.11570 | 0.36014 | 28.83% |
 
-相比最早的全量 FCN（0.25827），六折第一名 AP 增加 **0.02526**，相对提高 **9.78%**。相比普通单头 U-Net 提高 8.54%，相比 RUDY 提高 42.90%，相比原双模型提高 0.93%。如果以最初贴到终端的那次 U-Net 为起点，固定在同一个 `zero-riscy-b` 折，早期 U-Net 与新三模型的 AP 分别为 0.07404 和 0.12094，相对提高 63.34%。[最初的终端运行](runs/full_zerob_unet_terminal/test_metrics.json) · [逐设计数据](runs/rankings/local_per_design.csv)
+相比最早的全量 FCN（0.25827），六折第一名 AP 增加 **0.02526**，相对提高 **9.78%**。相比普通单头 U-Net 提高 8.54%，相比 RUDY 提高 42.90%，相比原双模型提高 0.93%。如果以最初贴到终端的那次 U-Net 为起点，固定在同一个 `zero-riscy-b` 折，早期 U-Net 与新三模型的 AP 分别为 0.07404 和 0.12094，相对提高 63.34%。[最初的终端运行](../runs/full_zerob_unet_terminal/test_metrics.json) · [逐设计数据](../runs/rankings/local_per_design.csv)
 
 若每份布局单独排序，平均布局内 AP 第一是新三模型融合（0.32243）。旧三模型的两种验证调权配置并列取得最低 MAE（0.03395）。固定验证阈值后，Pearson 双头加难负例排序取得最高 F1（32.75%）。
 
-换用 seed 43 在 `RISCY-FPU-b` 从头重训后，原双模型排第一（0.09644），新三模型排第二（0.09593），空间 AP 双模型排第三（0.09413）。原双模型少做一次网络前向，项目仍用它作为默认配置。[换种子复测](runs/spatial_refinement/outer_seed43_test.json) · [三模型复测](runs/spatial_refinement/consensus_outer_seed43_test.json)
+换用 seed 43 在 `RISCY-FPU-b` 从头重训后，原双模型排第一（0.09644），新三模型排第二（0.09593），空间 AP 双模型排第三（0.09413）。原双模型少做一次网络前向，项目仍用它作为默认配置。[换种子复测](../runs/spatial_refinement/outer_seed43_test.json) · [三模型复测](../runs/spatial_refinement/consensus_outer_seed43_test.json)
 
-新空间分支给上下文双头补充到芯片边缘的距离、8×8 邻域内各输入的标准差，并在训练中加入近似 AP 损失。三模型的三个热点头各占 1/3，回归输出取 1/2 Pearson、1/4 原上下文、1/4 空间上下文。旧双模型和空间双模型各运行两个网络。三模型方案在看到前两个测试折的主试验结果后登记，其余四个电路的本轮结果在登记时尚未产生。两个候选筛选划分均完整留出 `RISCY-FPU-b`，这个设计在更早的实验中曾用作验证。[选择记录](runs/spatial_refinement/selection.json) · [补充方案登记](runs/spatial_refinement/secondary_fusion_registration.json)
+新空间分支给上下文双头补充到芯片边缘的距离、8×8 邻域内各输入的标准差，并在训练中加入近似 AP 损失。三模型的三个热点头各占 1/3，回归输出取 1/2 Pearson、1/4 原上下文、1/4 空间上下文。旧双模型和空间双模型各运行两个网络。三模型方案在看到前两个测试折的主试验结果后登记，其余四个电路的本轮结果在登记时尚未产生。两个候选筛选划分均完整留出 `RISCY-FPU-b`，这个设计在更早的实验中曾用作验证。[选择记录](../runs/spatial_refinement/selection.json) · [补充方案登记](../runs/spatial_refinement/secondary_fusion_registration.json)
 
 | 测试电路 | RUDY AP | FCN AP | 单头 U-Net AP | 原双模型 AP | 空间双模型 AP | 新三模型 AP |
 |---|---:|---:|---:|---:|---:|---:|
@@ -49,13 +51,13 @@
 | RISCY-FPU-a | 0.35365 | 0.44588 | 0.43686 | 0.45636 | 0.46000 | 0.46069 |
 | RISCY-FPU-b | 0.05426 | 0.07978 | 0.07191 | 0.09544 | 0.09833 | 0.09997 |
 
-融合后，`RISCY-a`、`RISCY-FPU-a` 和 `RISCY-FPU-b` 的 AP 都超过各自的两个双模型。在 `zero-riscy-b` 上，单独更换空间分支会从 0.12118 降到 0.11448，同时保留原上下文后回到 0.12094。这些逐折结果体现了同时保留两个上下文预测的作用。[固定权重逐折对照](runs/spatial_refinement/secondary_fusion.csv)
+融合后，`RISCY-a`、`RISCY-FPU-a` 和 `RISCY-FPU-b` 的 AP 都超过各自的两个双模型。在 `zero-riscy-b` 上，单独更换空间分支会从 0.12118 降到 0.11448，同时保留原上下文后回到 0.12094。这些逐折结果体现了同时保留两个上下文预测的作用。[固定权重逐折对照](../runs/spatial_refinement/secondary_fusion.csv)
 
-在论文可对齐的 `zero-riscy-b` 折上，新三模型的 MAE / NRMS / SSIM / Pearson 为 **0.02758 / 0.03211 / 0.91734 / 0.35162**。相对同为三通道的 Pixel Diffusion，MAE 高 1.01%，Pearson 高 14.27%。十通道 CLDRoute 的 Pearson 为 0.36870，三模型低 0.01708，即 4.63%。论文该任务的表 9、10 没有发表同定义的热点 AP。论文数值和本地数值均来自各自实现。[本地同折结果](runs/spatial_refinement/consensus_zero-riscy-b_test.json) · [CLDRoute 表 9、10](https://arxiv.org/html/2607.16674v1#S5.SS2)
+在论文可对齐的 `zero-riscy-b` 折上，新三模型的 MAE / NRMS / SSIM / Pearson 为 **0.02758 / 0.03211 / 0.91734 / 0.35162**。相对同为三通道的 Pixel Diffusion，MAE 高 1.01%，Pearson 高 14.27%。十通道 CLDRoute 的 Pearson 为 0.36870，三模型低 0.01708，即 4.63%。论文该任务的表 9、10 没有发表同定义的热点 AP。论文数值和本地数值均来自各自实现。[本地同折结果](../runs/spatial_refinement/consensus_zero-riscy-b_test.json) · [CLDRoute 表 9、10](https://arxiv.org/html/2607.16674v1#S5.SS2)
 
 ## 上一轮 18 种方法的四折结果
 
-在原来四个测试电路、共 7,025 份布局上，Pearson 双头 + 原上下文的整折热点 AP 等权平均为 **0.28343**，是当时 18 种本地方法中最高的。原始 FCN 为 0.25599，绝对提高 0.02744，相对提高 **10.72%**。相对普通单头 U-Net 提高 **7.10%**，相对 RUDY 提高 **44.87%**。三个基线在四个测试电路上都被这个双模型超过。将本轮新三模型也应用在同样四折，AP 为 **0.28514**。[原 18 项的逐折来源](runs/model_comparison/comparison.csv) · [新三模型的历史四折](runs/spatial_refinement/secondary_fusion.csv)
+在原来四个测试电路、共 7,025 份布局上，Pearson 双头 + 原上下文的整折热点 AP 等权平均为 **0.28343**，是当时 18 种本地方法中最高的。原始 FCN 为 0.25599，绝对提高 0.02744，相对提高 **10.72%**。相对普通单头 U-Net 提高 **7.10%**，相对 RUDY 提高 **44.87%**。三个基线在四个测试电路上都被这个双模型超过。将本轮新三模型也应用在同样四折，AP 为 **0.28514**。[原 18 项的逐折来源](../runs/model_comparison/comparison.csv) · [新三模型的历史四折](../runs/spatial_refinement/secondary_fusion.csv)
 
 | 选择依据 | 本地最高的方法 | 四折成绩 |
 |---|---|---:|
@@ -66,13 +68,13 @@
 | 全图 MAE | 三模型调热点和回归权重、三模型只调回归权重（并列） | 0.03338 |
 | 用验证阈值报警，F1 | Pearson 双头 + 难负例排序 | 33.66% |
 
-当时选出的双模型对每个网格的热点分数取 1/3 Pearson 双头、2/3 上下文双头，连续拥塞值取两张回归图的均值。它需要两个网络前向，共 241,488 个参数。原固定三模型需要三次前向，四折 AP 为 0.28268。双模型在两个电路略高、两个略低，平均领先 0.00075。单独用上下文双头只需一次前向，平均 AP 距第一名 0.00192。按四个验证折的平均 AP 排，三模型同时调权最高（验证 0.21345、测试 0.28045）。这里对“最佳”的判断指本次四折测试表现。[融合公式与消融实现](compare_hotspot_methods.py) · [验证与测试结果](runs/model_comparison/comparison.csv)
+当时选出的双模型对每个网格的热点分数取 1/3 Pearson 双头、2/3 上下文双头，连续拥塞值取两张回归图的均值。它需要两个网络前向，共 241,488 个参数。原固定三模型需要三次前向，四折 AP 为 0.28268。双模型在两个电路略高、两个略低，平均领先 0.00075。单独用上下文双头只需一次前向，平均 AP 距第一名 0.00192。按四个验证折的平均 AP 排，三模型同时调权最高（验证 0.21345、测试 0.28045）。这里对“最佳”的判断指本次四折测试表现。[融合公式与消融实现](../compare_hotspot_methods.py) · [验证与测试结果](../runs/model_comparison/comparison.csv)
 
 原双模型在同一测试折相对三通道 Pixel Diffusion，MAE 低 0.98%，Pearson 高 6.61%，NRMS 高 0.44%，SSIM 低 0.28%。十通道 CLDRoute 的 Pearson 为 0.36870，原双模型为 0.32803，低 11.03%。本地如果优先空间相关，翻转增强双头 + 上下文可到 0.36106，距其 2.07%。CLDRoute 论文表 9、10 只给出该折的回归和空间指标，缺少计算同口径热点 AP 差距的结果。[CLDRoute 的 N28 拥塞结果](https://arxiv.org/html/2607.16674v1#S5.SS2)
 
 ## 本地与公开方法总表
 
-下表按 **zero-riscy-b 单折 Pearson** 排序，包含 21 种正式方案、6 份不同的早期全量 checkpoint、4 种论文对照。中间五列均来自这一个电路，最右两列附上本地正式方案的六折 AP 名次与均值。早期 checkpoint 的六折栏留空。四个论文方法均只报告了该折的回归与空间相关指标。十通道模型还使用了布线利用率和早期全局布线 overflow，本地学习模型只读三张布局图。[特征表](https://arxiv.org/html/2607.16674v1#S3.SS1) · [单折数据与各指标名次](runs/rankings/rankings.csv)
+下表按 **zero-riscy-b 单折 Pearson** 排序，包含 21 种正式方案、6 份不同的早期全量 checkpoint、4 种论文对照。中间五列均来自这一个电路，最右两列附上本地正式方案的六折 AP 名次与均值。早期 checkpoint 的六折栏留空。四个论文方法均只报告了该折的回归与空间相关指标。十通道模型还使用了布线利用率和早期全局布线 overflow，本地学习模型只读三张布局图。[特征表](https://arxiv.org/html/2607.16674v1#S3.SS1) · [单折数据与各指标名次](../runs/rankings/rankings.csv)
 
 | 同折 Pearson 名次 | 模型或运行 | 来源 | Pearson ↑ | MAE ↓ | NRMS ↓ | SSIM ↑ | 同折热点 AP ↑ | 六折 AP 名次 | 六折 AP ↑ |
 |---|---|---|---|---|---|---|---|---|---|
@@ -108,7 +110,7 @@
 | 30 | 单头 U-Net 加权 MSE α=3 | 本地旧权重 | 0.07367 | 0.03042 | 0.03668 | 0.88836 | 0.06669 | — | — |
 | 31 | FCN（普通 MSE） | 本地 | 0.02521 | 0.02707 | 0.03218 | 0.91145 | 0.06901 | 19 | 0.25827 |
 
-同折四个论文方法引自 CLDRoute 的 N28 拥塞表 9。逐个核对了公开清单与本地的布局 ID 和所属电路，训练 7,872、验证 1,248、测试 1,122 份全部一致。公开评估对每份布局计算回归指标，CLDRoute 采用三个采样种子的结果，本地使用一个训练种子。两边各自处理输入和标签。CLDRoute 发布了此划分的模型权重与十通道特征，本表引用论文成绩。六折 AP 对照还需要相应训练划分的预测图。[作者发布的权重与特征](https://github.com/kiranthorat3/CLDRoute#pretrained-models--dataset) · [CLDRoute 表 9](https://arxiv.org/html/2607.16674v1#S5.SS2) · [作者评估实现](https://github.com/kiranthorat3/CLDRoute/blob/383281f9f7eca0f037d511a24749dca6cdd74837/src/ldm_control/latent_sampler.py) · [划分核对记录](runs/model_comparison/published_split_check.json)
+同折四个论文方法引自 CLDRoute 的 N28 拥塞表 9。逐个核对了公开清单与本地的布局 ID 和所属电路，训练 7,872、验证 1,248、测试 1,122 份全部一致。公开评估对每份布局计算回归指标，CLDRoute 采用三个采样种子的结果，本地使用一个训练种子。两边各自处理输入和标签。CLDRoute 发布了此划分的模型权重与十通道特征，本表引用论文成绩。六折 AP 对照还需要相应训练划分的预测图。[作者发布的权重与特征](https://github.com/kiranthorat3/CLDRoute#pretrained-models--dataset) · [CLDRoute 表 9](https://arxiv.org/html/2607.16674v1#S5.SS2) · [作者评估实现](https://github.com/kiranthorat3/CLDRoute/blob/383281f9f7eca0f037d511a24749dca6cdd74837/src/ldm_control/latent_sampler.py) · [划分核对记录](../runs/model_comparison/published_split_check.json)
 
 RouteNet、ibUNet 来自 ibUNet 论文表 1，作者报告 7,078 份训练、3,164 份测试。AxialNet 使用像素与网表特征，官方划分含 705 份训练、705 份验证，两种 zero-riscy 电路一起留出，报告 3,164 份未见布局。下表给出各自协议的成绩。[ibUNet 论文](https://arxiv.org/pdf/2402.10937#page=5) · [AxialNet 官方实验](https://github.com/BUPT-GAMMA/AxialNet#results)
 
@@ -122,13 +124,13 @@ RouteNet、ibUNet 来自 ibUNet 论文表 1，作者报告 7,078 份训练、3,1
 | AxialNet，联合留出 zero-riscy-a/b | 官方给出的单个方法成绩为 NRMSE 0.033517、SSIM 0.837772。该协议的训练/验证集各 705 份。[AxialNet 官方结果与划分](https://github.com/BUPT-GAMMA/AxialNet#results) |
 | LHNN 原论文表 2，ISPD 2011 与 DAC 2012，水平拥塞 F1 ↑ | **1. LHNN 40.89%**，2. 四层 MLP 32.58%，3. Pix2Pix 30.20%，4. U-Net 29.75%。[LHNN 表 2](https://arxiv.org/pdf/2203.12831#page=5) |
 
-HGRP 使用网表拓扑和布局几何，四个 RISCY 系列设计训练，两个 zero-riscy 设计用于验证和测试，按训练拥塞分布的第 90 百分位定义热点。论文表 1 的 PR-AUC 为 0.5428，表 2 四个种子的均值为 0.5167。本项目计算按电路等权的非插值 AP，各折阈值取自训练标签中的正值抽样。直接相减会同时引入划分、热点定义和汇总方式的影响。[HGRP 指标定义](https://arxiv.org/pdf/2610.20209#page=3) · [HGRP 划分及多种子成绩](https://arxiv.org/pdf/2610.20209#page=5) · [本地 AP 实现](ranking.py)
+HGRP 使用网表拓扑和布局几何，四个 RISCY 系列设计训练，两个 zero-riscy 设计用于验证和测试，按训练拥塞分布的第 90 百分位定义热点。论文表 1 的 PR-AUC 为 0.5428，表 2 四个种子的均值为 0.5167。本项目计算按电路等权的非插值 AP，各折阈值取自训练标签中的正值抽样。直接相减会同时引入划分、热点定义和汇总方式的影响。[HGRP 指标定义](https://arxiv.org/pdf/2610.20209#page=3) · [HGRP 划分及多种子成绩](https://arxiv.org/pdf/2610.20209#page=5) · [本地 AP 实现](../ranking.py)
 
 MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1%，缺少可据此换算本项目 AP 的同折绝对值。迭代中还引用了 CoordConv、条带池化、金字塔池化、FiLM、Focal Loss 和可微 AP 等架构或训练组件。它们在项目中作用于对应模型行，单独的芯片测试名次需要完整预测器的输出。[MSANet 原文](https://ieeexplore.ieee.org/document/10779655/) · [项目方法来源](ITERATION_LOG.md#文献复查与新一轮全量实验)
 
 ## 同一批 21 种方案在原四折的排名
 
-当时的四个测试电路共 7,025 份布局。这里将后来开发的空间方案也放在这四个电路上比较。全部六个电路的每项分数与 AP 名次可在逐设计文件中查询。[逐设计成绩和名次](runs/rankings/local_per_design.csv)
+当时的四个测试电路共 7,025 份布局。这里将后来开发的空间方案也放在这四个电路上比较。全部六个电路的每项分数与 AP 名次可在逐设计文件中查询。[逐设计成绩和名次](../runs/rankings/local_per_design.csv)
 
 | 四折 AP 名次 | 模型 | zero-riscy-b AP | RISCY-a AP | zero-riscy-a AP | RISCY-b AP | 等权 AP ↑ | 布局内 AP ↑ | 阈值 F1 ↑ | MAE ↓ | Pearson ↑ |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -170,7 +172,7 @@ MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1
 
 - 相对 RUDY，四折 AP 从 0.19565 到 0.28343，绝对差 +0.08779，相对变化 +44.87%。四个电路中有 4 个 AP 提高。
 
-如果“最早”指终端上看到的单头 U-Net（AP 0.07404），只比较当时的 zero-riscy-b 电路，原双模型为 0.12118，绝对提高 0.04714，相对提高 63.66%。[原始输出](runs/full_zerob_unet_terminal/test_metrics.json)
+如果“最早”指终端上看到的单头 U-Net（AP 0.07404），只比较当时的 zero-riscy-b 电路，原双模型为 0.12118，绝对提高 0.04714，相对提高 63.66%。[原始输出](../runs/full_zerob_unet_terminal/test_metrics.json)
 
 ## 原双模型与公开方法的逐项差距
 
@@ -198,7 +200,7 @@ MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1
 
 ## 数据与指标
 
-本地使用 10,242 份布局、6 个电路设计。每折用一个完整电路测试、一个完整电路验证、其余四个训练。同一电路的布局变体在该折始终在同一个分区。原 18 种模型的大表使用前四折、共 7,025 份不同布局。本次总榜中的 21 种正式方案均覆盖下表六折、全部 10,242 份布局。[数据集](https://circuitnet.github.io/) · [本地全量清单](data/n28_full/manifest.csv)
+本地使用 10,242 份布局、6 个电路设计。每折用一个完整电路测试、一个完整电路验证、其余四个训练。同一电路的布局变体在该折始终在同一个分区。原 18 种模型的大表使用前四折、共 7,025 份不同布局。本次总榜中的 21 种正式方案均覆盖下表六折、全部 10,242 份布局。[数据集](https://circuitnet.github.io/) · [本地全量清单](../data/n28_full/manifest.csv)
 
 | 测试电路 | 验证电路 | 训练布局 | 验证布局 | 测试布局 | 训练集确定的热点阈值 | 测试网格中真实热点占比 |
 |---|---|---:|---:|---:|---:|---:|
@@ -209,7 +211,7 @@ MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1
 | RISCY-FPU-a | RISCY-b | 6,415 | 1,858 | 1,969 | 0.173675 | 13.84% |
 | RISCY-FPU-b | RISCY-b | 7,136 | 1,858 | 1,248 | 0.182592 | 3.27% |
 
-输入为 Macro Region、RUDY、Pin RUDY。RUDY 基线直接使用其中的 RUDY 通道。标签是水平与垂直 global-routing overflow 相加后，对每份布局归一化到 [0, 1] 的 256×256 图。真实热点取标签大于等于本折阈值的网格。阈值是训练布局中抽样正值的第 90 百分位，每份布局最多抽 2,048 个正值。[数据处理](prepare_n28.py) · [训练和评估](train.py)
+输入为 Macro Region、RUDY、Pin RUDY。RUDY 基线直接使用其中的 RUDY 通道。标签是水平与垂直 global-routing overflow 相加后，对每份布局归一化到 [0, 1] 的 256×256 图。真实热点取标签大于等于本折阈值的网格。阈值是训练布局中抽样正值的第 90 百分位，每份布局最多抽 2,048 个正值。[数据处理](../prepare_n28.py) · [训练和评估](../train.py)
 
 | 指标 | 回答的问题 |
 |---|---|
@@ -219,9 +221,9 @@ MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1
 | MAE ↓、NRMS ↓ | 每个网格的拥塞程度预测得有多准？MAE 衡量绝对误差，NRMS 是每份布局的 RMSE 除以其真实标签的极差。 |
 | SSIM ↑、Pearson ↑ | 热力图的局部结构、整张图的空间起伏有多像真实图？两者都在每份布局上计算。Pearson 是相关系数，同时也是一类模型训练损失中的组成项。 |
 
-如果把所有网格都预测为 0，所有分数并列，该折 AP 等于真实热点占比。六折等权得到 AP 0.08906、MAE 0.11776，可用作读表时的常数参考。[真实热点数和测试网格数](runs/rankings/local_per_design.csv)
+如果把所有网格都预测为 0，所有分数并列，该折 AP 等于真实热点占比。六折等权得到 AP 0.08906、MAE 0.11776，可用作读表时的常数参考。[真实热点数和测试网格数](../runs/rankings/local_per_design.csv)
 
-六折主对照中的可训练网络使用 Adam、15 轮、学习率 0.002、batch size 4、seed 42、CUDA，按验证整折 AP 选 checkpoint。回归图计算 MAE、NRMS、SSIM、Pearson。双头模型的另一张热点分数图计算 AP 和 F1。各表中的平均值对相应电路等权，四折表每折占 1/4，六折表每折占 1/6。完整 CSV 也给出固定检查 5% 网格时的精确率与召回率。[排序实现](ranking.py) · [对照评估](compare_hotspot_methods.py)
+六折主对照中的可训练网络使用 Adam、15 轮、学习率 0.002、batch size 4、seed 42、CUDA，按验证整折 AP 选 checkpoint。回归图计算 MAE、NRMS、SSIM、Pearson。双头模型的另一张热点分数图计算 AP 和 F1。各表中的平均值对相应电路等权，四折表每折占 1/4，六折表每折占 1/6。完整 CSV 也给出固定检查 5% 网格时的精确率与召回率。[排序实现](../ranking.py) · [对照评估](../compare_hotspot_methods.py)
 
 | 表中的模型名称 | 训练或推理方式 |
 |---|---|
@@ -238,18 +240,18 @@ MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1
 
 | 实验 | 规模与选择方式 | 可核对的结果 |
 |---|---|---|
-| 最早 FCN，普通 MSE / 加权 MSE（α=3） | CPU，训练/验证/测试 128/32/32，按验证 MAE 选 checkpoint | 普通模型测试 MAE 0.03082、F1 0.77%，加权后 MAE 0.03011、F1 4.62%。下表给出本次补算的 AP。[普通](runs/fold_zerob_baseline/test_metrics.json) · [加权](runs/fold_zerob_weighted/test_metrics.json) |
-| FCN，按验证 F1 扫描 α=0/1/3/5 | CPU，同样 128/32/32 | 最佳验证 F1 依次为 17.07%、16.81%、16.78%、16.51%。留有测试记录的 α=0/1，测试 F1 为 8.14%/5.58%。另一次按 MAE 选的 α=0 测试 F1 为 0.70%。[α=0](runs/pilot_zerob_f1_alpha0/test_metrics.json) · [α=1](runs/pilot_zerob_f1_alpha1/test_metrics.json) · [按 MAE 选](runs/pilot_zerob_mae_alpha0/test_metrics.json) |
-| 单头 U-Net，按验证 AP 扫描 α=0/1/3 | 全量，验证 RISCY-FPU-b | 最佳验证 AP 依次为 0.08596、0.07952、0.08239。[α=0](runs/zerob_unet_weight_sweep_alpha0/validation_metrics.json) · [α=1](runs/zerob_unet_weight_sweep_alpha1/validation_metrics.json) · [α=3](runs/zerob_unet_weight_sweep_alpha3/validation_metrics.json) |
-| 双头 U-Net，瓶颈空洞率 3 | 全量，验证 RISCY-FPU-b | 最佳验证 AP 0.10042，MAE 0.02714。本轮补算了该次原始权重在 zero-riscy-b 的测试结果。[运行记录](runs/correlation_iterations/dev_dilation3_seed42/validation_metrics.json) |
-| 早期终端输出的单头 U-Net | 全量，测试 zero-riscy-b，原始检测阈值 0.18063 | 测试 AP 0.07404、MAE 0.02793、F1 0.022%。[终端对应结果](runs/full_zerob_unet_terminal/test_metrics.json) |
-| 单头与双头的配对重跑 | 全量，测试 zero-riscy-b，显式固定训练打乱顺序 | 单头 AP 0.08865、双头 AP 0.11881。四折主表沿用归档对照中的普通单头 checkpoint，该折 AP 0.10151。不同历史运行分别保留。[单头](runs/zerob_unet_head_compare_unet_seed42/test_metrics.json) · [双头](runs/zerob_unet_head_compare_unet-hotspot_seed42/test_metrics.json) · [主表单头](runs/full_zero-riscy-b_unet_ap_cuda/test_metrics.json) |
-| RUDY / FCN / 单头 U-Net | 全量，额外测试 RISCY-FPU-a，验证 RISCY-b，训练/验证/测试 6,415/1,858/1,969 | 测试 AP 为 0.35365 / **0.44588** / 0.43686，MAE 为 0.12252 / **0.04112** / 0.04188。这是最初三基线阶段的排名。[原始 CSV](runs/full_ap_cuda_comparison.csv) |
+| 最早 FCN，普通 MSE / 加权 MSE（α=3） | CPU，训练/验证/测试 128/32/32，按验证 MAE 选 checkpoint | 普通模型测试 MAE 0.03082、F1 0.77%，加权后 MAE 0.03011、F1 4.62%。下表给出本次补算的 AP。[普通](../runs/fold_zerob_baseline/test_metrics.json) · [加权](../runs/fold_zerob_weighted/test_metrics.json) |
+| FCN，按验证 F1 扫描 α=0/1/3/5 | CPU，同样 128/32/32 | 最佳验证 F1 依次为 17.07%、16.81%、16.78%、16.51%。留有测试记录的 α=0/1，测试 F1 为 8.14%/5.58%。另一次按 MAE 选的 α=0 测试 F1 为 0.70%。[α=0](../runs/pilot_zerob_f1_alpha0/test_metrics.json) · [α=1](../runs/pilot_zerob_f1_alpha1/test_metrics.json) · [按 MAE 选](../runs/pilot_zerob_mae_alpha0/test_metrics.json) |
+| 单头 U-Net，按验证 AP 扫描 α=0/1/3 | 全量，验证 RISCY-FPU-b | 最佳验证 AP 依次为 0.08596、0.07952、0.08239。[α=0](../runs/zerob_unet_weight_sweep_alpha0/validation_metrics.json) · [α=1](../runs/zerob_unet_weight_sweep_alpha1/validation_metrics.json) · [α=3](../runs/zerob_unet_weight_sweep_alpha3/validation_metrics.json) |
+| 双头 U-Net，瓶颈空洞率 3 | 全量，验证 RISCY-FPU-b | 最佳验证 AP 0.10042，MAE 0.02714。本轮补算了该次原始权重在 zero-riscy-b 的测试结果。[运行记录](../runs/correlation_iterations/dev_dilation3_seed42/validation_metrics.json) |
+| 早期终端输出的单头 U-Net | 全量，测试 zero-riscy-b，原始检测阈值 0.18063 | 测试 AP 0.07404、MAE 0.02793、F1 0.022%。[终端对应结果](../runs/full_zerob_unet_terminal/test_metrics.json) |
+| 单头与双头的配对重跑 | 全量，测试 zero-riscy-b，显式固定训练打乱顺序 | 单头 AP 0.08865、双头 AP 0.11881。四折主表沿用归档对照中的普通单头 checkpoint，该折 AP 0.10151。不同历史运行分别保留。[单头](../runs/zerob_unet_head_compare_unet_seed42/test_metrics.json) · [双头](../runs/zerob_unet_head_compare_unet-hotspot_seed42/test_metrics.json) · [主表单头](../runs/full_zero-riscy-b_unet_ap_cuda/test_metrics.json) |
+| RUDY / FCN / 单头 U-Net | 全量，额外测试 RISCY-FPU-a，验证 RISCY-b，训练/验证/测试 6,415/1,858/1,969 | 测试 AP 为 0.35365 / **0.44588** / 0.43686，MAE 为 0.12252 / **0.04112** / 0.04188。这是最初三基线阶段的排名。[原始 CSV](../runs/full_ap_cuda_comparison.csv) |
 | RUDY / FCN / 单头 U-Net，小样本架构试验 | 每设计 96 份，测试 RISCY-FPU-a | 用户早期在 Mac 报告 AP 0.3502 / 0.4124 / 0.4157。本地工作区缺少该次逐布局记录。 |
 
-早期 Mac 全量 `zero-riscy-b` 实验中，项目交接记录给出的排序 AP 第一为 U-Net，验证阈值下的测试召回约 1.05%，固定阈值 F1 第一为 RUDY。工作区缺少该次完整逐项分数。本地统一榜使用有权重、配置和逐折测试结果的 CUDA 运行。另有一个 1 轮 CUDA 冒烟试验，以及各有 1 轮和 3 轮历史的早期 CPU、MPS 全量 FCN 目录，均没有完整 15 轮训练的可比测试分数。[冒烟试验](runs/pilot_cuda_check/config.json) · [CPU 历史](runs/full_zerob_baseline/history.json) · [MPS 历史](runs/full_zerob_baseline_mps/history.json)
+早期 Mac 全量 `zero-riscy-b` 实验中，项目交接记录给出的排序 AP 第一为 U-Net，验证阈值下的测试召回约 1.05%，固定阈值 F1 第一为 RUDY。工作区缺少该次完整逐项分数。本地统一榜使用有权重、配置和逐折测试结果的 CUDA 运行。另有一个 1 轮 CUDA 冒烟试验，以及各有 1 轮和 3 轮历史的早期 CPU、MPS 全量 FCN 目录，均没有完整 15 轮训练的可比测试分数。[冒烟试验](../runs/pilot_cuda_check/config.json) · [CPU 历史](../runs/full_zerob_baseline/history.json) · [MPS 历史](../runs/full_zerob_baseline_mps/history.json)
 
-**最早的 32 份测试布局也补算了 AP。** 下表逐个加载完成 15 轮训练的原始 FCN 权重，使用相同的 128/32/32 布局清单与原阈值 0.177566。检测 F1 沿用当时的固定分数阈值。第三列保留了最初选择 checkpoint 的依据，两次普通 MSE、按 MAE 选权重的独立运行分别列出。[七次权重、阈值与完整结果](runs/rankings/pilot_results.json)
+**最早的 32 份测试布局也补算了 AP。** α 将真实热点网格的平方误差权重设为 1 + α，其余网格权重为 1。下表逐个加载完成 15 轮训练的原始 FCN 权重，使用相同的 128/32/32 布局清单与原阈值 0.177566。检测 F1 沿用当时的固定分数阈值。第三列保留了最初选择 checkpoint 的依据，两次普通 MSE、按 MAE 选权重的独立运行分别列出。[七次权重、阈值与完整结果](../runs/rankings/pilot_results.json)
 
 | AP 名次 | FCN 拥塞权重 α | 选择 checkpoint | 小样本测试 AP ↑ | 测试 MAE ↓ | 原阈值 F1 ↑ |
 |---:|---:|---|---:|---:|---:|
@@ -261,13 +263,15 @@ MSANet 的公开摘要给出在其 CircuitNet 实验中相对原模型提高 7.1
 | 6 | 0 | 验证 MAE，后续重跑 | 0.16535 | 0.03075 | 0.70% |
 | 7 | 0 | 验证 MAE，最早普通 MSE | 0.16365 | 0.03082 | 0.77% |
 
-每设计 96 份的 Mac 试验中，`RISCY-FPU-a` 测试 AP 从高到低为单头 U-Net 0.4157、FCN 0.4124、RUDY 0.3502。这三个数来自项目交接。最初的全量 U-Net 验证损失权重扫描中，按验证 AP 排名为 α=0（0.08596）、α=3（0.08239）、α=1（0.07952）。本轮冻结权重回放新增的测试成绩单列来源。[早期扫描记录](runs/model_comparison/comparison.csv)
+每设计 96 份的 Mac 试验中，`RISCY-FPU-a` 测试 AP 从高到低为单头 U-Net 0.4157、FCN 0.4124、RUDY 0.3502。这三个数来自项目交接。最初的全量 U-Net 验证损失权重扫描中，按验证 AP 排名为 α=0（0.08596）、α=3（0.08239）、α=1（0.07952）。本轮冻结权重回放新增的测试成绩单列来源。[早期扫描记录](../runs/model_comparison/comparison.csv)
 
-四折主表沿用早期已经公布的 `zero-riscy-b` 普通 FCN 和单头 U-Net checkpoint。其配置记录了总随机种子 42，较新的训练入口另行记录了数据打乱种子 42。这一折不同历史运行的 AP 有差异，因此各自的测试结果和来源都保留在表中。[较早 U-Net 配置](runs/full_zero-riscy-b_unet_ap_cuda/config.json) · [配对重跑配置](runs/zerob_unet_head_compare_unet_seed42/config.json)
+四折主表沿用早期已经公布的 `zero-riscy-b` 普通 FCN 和单头 U-Net checkpoint。其配置记录了总随机种子 42，较新的训练入口另行记录了数据打乱种子 42。这一折不同历史运行的 AP 有差异，因此各自的测试结果和来源都保留在表中。[较早 U-Net 配置](../runs/full_zero-riscy-b_unet_ap_cuda/config.json) · [配对重跑配置](../runs/zerob_unet_head_compare_unet_seed42/config.json)
 
 ### 开发阶段的四种空间与分数消融
 
-在当时的两份验证电路上，五种候选按等权 AP 依次为空间 + AP 双模型 0.27887，空间双模型 0.27457，原双模型 0.27307，两个预测头的分数融合 0.27206，布局分数居中 0.27056。本轮加载原权重，在 `RISCY-FPU-b` 补测四种先前只用于筛选的方案，并与该折 21 种正式方案一起排名。[原验证选择](runs/spatial_refinement/selection.json) · [本轮单折测试](runs/rankings/screen_FPU-b_test.json)
+在当时的两份验证电路上，五种候选按等权 AP 依次为空间 + AP 双模型 0.27887，空间双模型 0.27457，原双模型 0.27307，两个预测头的分数融合 0.27206，布局分数居中 0.27056。本轮加载原权重，在 `RISCY-FPU-b` 补测四种先前只用于筛选的方案，并与该折 21 种正式方案一起排名。[原验证选择](../runs/spatial_refinement/selection.json) · [本轮单折测试](../runs/rankings/screen_FPU-b_test.json)
+
+四个单折对照各只改动一处。空间上下文单网在原上下文上增加边缘距离和邻域标准差，沿用原训练损失。空间双模型把这个网络与 Pearson 双头按 2:1 混合热点概率。布局分数居中从原双模型每格的热点 logit 中扣除该布局平均 logit 的一半，布局内排序保持不变。跨头融合则将拥塞回归值对齐到热点 logit 的尺度，再按 25% 回归、75% 热点分类组合。
 
 | 外层该折 25 项中的 AP 名次 | 方案 | 测试 AP ↑ | 布局内 AP ↑ | MAE ↓ |
 |---|---|---|---|---|
@@ -307,6 +311,6 @@ python rank_models.py --scope zero_b_joint
 python rank_models.py --scope all
 ```
 
-第一条显示六折热点 AP，第二条显示同一电路上的本地与论文 Pearson 排名，第三条给出所有实验组。逐设计 CSV 包含每种方法的原始指标、名次、训练确定的真实热点阈值、验证确定的报警阈值和原始结果路径。完整汇总保留每篇论文的指标名与来源。[各实验组 CSV](runs/rankings/rankings.csv) · [逐设计排名 CSV](runs/rankings/local_per_design.csv)
+第一条显示六折热点 AP，第二条显示同一电路上的本地与论文 Pearson 排名，第三条给出所有实验组。逐设计 CSV 包含每种方法的原始指标、名次、训练确定的真实热点阈值、验证确定的报警阈值和原始结果路径。完整汇总保留每篇论文的指标名与来源。[各实验组 CSV](../runs/rankings/rankings.csv) · [逐设计排名 CSV](../runs/rankings/local_per_design.csv)
 
-使用 `python rank_models.py --stage export` 可从保存的结果重新核对权重、划分和阈值后导出两个 CSV。`python rank_models.py --stage all` 在已有四折与空间试验归档的基础上复现本轮补训、旧权重回放和排序。早期 18 项四折比较可单独用 `python runs/model_comparison/export_table.py` 导出。项目开发过程中已经查看过这六个设计的结果，六折主榜使用 seed 42，seed 43 的配对结果限于一个设计。[复现说明](Instruction.md#all-method-rankings) · [迭代日志](ITERATION_LOG.md) · [论文划分核对](runs/model_comparison/published_split_check.json)
+使用 `python rank_models.py --stage export` 可从保存的结果重新核对权重、划分和阈值后导出两个 CSV。`python rank_models.py --stage all` 在已有四折与空间试验归档的基础上复现本轮补训、旧权重回放和排序。早期 18 项四折比较可单独用 `python runs/model_comparison/export_table.py` 导出。项目开发过程中已经查看过这六个设计的结果，六折主榜使用 seed 42，seed 43 的配对结果限于一个设计。[复现说明](EXPERIMENTS.md#all-method-rankings) · [迭代日志](ITERATION_LOG.md) · [论文划分核对](../runs/model_comparison/published_split_check.json)

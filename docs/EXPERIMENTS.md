@@ -1,4 +1,6 @@
-# Placement-Based Routing Congestion Prediction
+# Experiment protocols
+
+Use these commands from the repository root to reproduce the pilot, ablations and six-fold evaluation. For environment setup and a first run, see the [project README](../README.md).
 
 The reference GPDL FCN maps three placement channels to one congestion map
 (`--model fcn`, 119,169 parameters). The lightweight U-Net (`--model unet`, 118,725 parameters) uses
@@ -6,8 +8,7 @@ skip connections at full, half, and quarter resolution. The experiments use
 design-held-out splits and report MAE and hotspot metrics.
 [CircuitNet reference code](https://github.com/circuitnet/CircuitNet)
 
-The four-design comparison covers 18 local methods, the original baselines,
-and published CircuitNet-N28 results. [Model comparison](MODEL_COMPARISON.md)
+The final comparison covers 21 local methods across six held-out designs. The earlier four-design experiments and matched-fold comparisons with published methods are also recorded. [Model comparison](MODEL_COMPARISON.md)
 
 ## Data contract
 
@@ -238,8 +239,8 @@ The evaluator also reports pooled hotspot AP, mean AP within positive layouts,
 MAE, spatial Pearson and SSIM. The iteration log contains the training and
 evaluation commands, checkpoint paths and design-level comparison.
 [Iteration log](ITERATION_LOG.md#文献复查与新一轮全量实验) ·
-[Results by design](runs/context_study/comparison.csv) ·
-[Held-out comparison figure](runs/context_study/heldout_metrics.png)
+[Results by design](../runs/context_study/comparison.csv) ·
+[Held-out comparison figure](../runs/context_study/heldout_metrics.png)
 
 ### All-method rankings
 

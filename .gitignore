@@ -1,5 +1,7 @@
 
 /data
 /runs
-/__pycache__
+__pycache__/
+*.py[cod]
+/.venv/
 /CircuitNet-N28
