@@ -2,7 +2,9 @@
 
 PRoCoP predicts where an ASIC layout will run out of routing capacity before global routing. Given three placement-stage maps, it estimates congestion on a 256 × 256 grid and ranks tiles for inspection. The project evaluates how well these rankings transfer to unseen circuit designs. The best of 21 evaluated methods is a three-model U-Net ensemble with **0.28353 mean hotspot average precision (AP)** across six held-out designs.
 
-[Run the best model](#run-the-best-model-with-saved-weights) · [Compare all 21 methods](docs/MODEL_COMPARISON.md) · [View 24 layout predictions](figures/README.md)
+[Run the best model](#run-the-best-model-with-saved-weights) · [Compare all 21 methods](docs/MODEL_COMPARISON.md) · [View 24 layout predictions](figures/README.md#held-out-layout-samples)
+
+![Three independent U-Nets fuse hotspot scores and congestion maps from the same placement inputs.](figures/spatial_consensus_architecture.png)
 
 ## Set up the environment
 

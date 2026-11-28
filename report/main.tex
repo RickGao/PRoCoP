@@ -11,12 +11,12 @@
   \author{\IEEEauthorblockN{Ruichen Gao and Tianyi Yu}\IEEEauthorblockA{Georgia Institute of Technology}}
 \fi
 
-\IfFileExists{02_4911-RISCY-FPU-a-2-c5-u0.png}{\newcommand{\samplefigure}{02_4911-RISCY-FPU-a-2-c5-u0.png}}{\newcommand{\samplefigure}{../figures/RISCY-FPU-a/02_4911-RISCY-FPU-a-2-c5-u0.png}}
+\graphicspath{{./}{../figures/}{../figures/RISCY-FPU-a/}{../figures/RISCY-FPU-b/}}
 
 \begin{document}
 \maketitle
 \begin{abstract}
-A placer can estimate where nets will compete for routing resources before a global router measures overflow. We ask how well those estimates identify the most congested tiles of an unseen circuit. Using 10,242 CircuitNet-N28 layouts, we compare rectangular uniform wire density (RUDY), convolutional baselines, and predictors that learn separate congestion and hotspot maps. Across six held-out designs, a three-model U-Net ensemble achieves mean hotspot average precision (AP) of 0.28353, compared with 0.19842 for RUDY and 0.25827 for a fully convolutional network. The ensemble improves on both baselines in every fold. Transferring an alarm threshold from validation is harder. At those thresholds the ensemble averages 25.25\% precision and 58.75\% recall. These results distinguish the ability to prioritize tiles from the ability to issue reliable alarms on a new circuit.
+A placer can estimate where nets will compete for routing resources before a global router measures overflow. We ask how well those estimates identify the most congested tiles of an unseen circuit. Using 10,242 CircuitNet-N28 layouts, we compare rectangular uniform wire density (RUDY), convolutional baselines, and predictors that learn separate congestion and hotspot maps. Across six held-out designs, a three-model U-Net ensemble achieves mean hotspot average precision (AP) of 0.28353, compared with 0.19842 for RUDY and 0.25827 for a fully convolutional network. The ensemble improves on both baselines in every fold. Transferring an alarm threshold from validation is harder. At those thresholds the ensemble averages 25.24\% precision and 58.75\% recall. These results distinguish the ability to prioritize tiles from the ability to issue reliable alarms on a new circuit.
 \end{abstract}
 
 \section{Introduction}
@@ -55,6 +55,15 @@ Evaluation protocols are just as uneven. Liu et al.\ hold out whole designs, tra
 Prior studies use several definitions of a hotspot, ranging from design-rule violations to demand exceeding capacity. We focus on the upper tail of normalized global-routing overflow. Within each fold, all methods share the same layout population and true hotspot labels. This lets us compare three distinct outcomes on the same circuits: map error, tile ranking, and detection at an alarm threshold chosen on a separate design.
 
 \section{Methodology}
+Figure~\ref{fig:architecture} traces one placement through the three predictors. Each branch produces a hotspot score and an overflow estimate at every tile. The two outputs follow separate fusion paths.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{spatial_consensus_architecture.png}
+\caption{Placement-to-congestion inference. All three U-Nets receive the same placement maps and have independent weights. Dashed paths carry encoder features to the matching decoder resolutions. The context pathways in C and S modulate both output heads. The ensemble averages hotspot scores across branches and gives the Pearson branch half the weight in the overflow map.}
+\label{fig:architecture}
+\end{figure*}
+
 \subsection{Placement maps and supervision}
 For each CircuitNet-N28 layout we read a macro-region map, RUDY, and pin RUDY~\cite{chai2022circuitnet,chai2023circuitnet}. The first locates macros, the second estimates demand across net bounding boxes, and the third describes demand at pin locations. We resize all channels and the two directional overflow maps to $256\times256$ by cubic interpolation. We min--max normalize each input channel independently within its layout. For the target $y$, we sum the resized horizontal and vertical overflows and min--max normalize the sum within that layout. Constant maps are set to zero. A high target value therefore identifies severe overflow relative to other tiles in the same layout. Recovering an absolute count of excess routing tracks would require the original scale.
 
@@ -85,7 +94,7 @@ Each network sees the same three input maps at inference. For the three-model en
 \end{align}
 These weights result from averaging two existing predictors, $P+C$ and $P+S$. Each pair gives its context branch twice the weight of $P$ for hotspot scoring and averages the two maps equally. Reusing $P$ gives three forward passes and 365,318 total parameters for the ensemble.
 
-\section{Experiments}
+\section{Experiments and Evaluation}
 \subsection{Design splits and model selection}
 The full manifest contains 10,242 layouts. In each fold we reserve all layouts of one design for testing and a second complete design for validation. The remaining four designs supply training data. Table~\ref{tab:design} identifies both reserved designs for each fold. We train the main comparisons with Adam for 15 epochs, learning rate 0.002, batch size four, seed 42, on CUDA. We keep the checkpoint with the highest validation-fold AP. For thresholded detection, we independently select the model score cutoff that maximizes validation F1, then freeze it on the test design. This score cutoff can vary across methods. The training-derived label cutoff $t$ is common to all methods within a fold.
 
@@ -94,7 +103,6 @@ We compared 21 methods, including single networks, feature and loss ablations, a
 \subsection{Evaluation measures}
 Our primary metric pools all tiles of one test design. Sorting scores in descending order gives precision $p_k$ and recall $r_k$ at each distinct score, with ties entering together. Average precision is $\mathrm{AP}=\sum_k (r_k-r_{k-1})p_k$. We also calculate AP within each layout that contains a hotspot. MAE averages $|\hat y_i-y_i|$ over the tiles; spatial Pearson measures agreement in the shape of each congestion map. For alarms, precision is the fraction of flagged tiles that are true hotspots, recall is the fraction of true hotspots flagged, and F1 is their harmonic mean within the fold. We average each metric equally over the six designs. This gives a small design the same influence as a design with twice as many layouts.
 
-\section{Evaluation and Discussion}
 \begin{table*}[t]
 \centering
 \caption{Selected methods from the 21-method comparison. Each column is the unweighted mean of six test-design metrics (seed 42). Precision, recall, and F1 use the transferred validation cutoff. F1 is averaged after it is computed within each fold.}
@@ -144,16 +152,17 @@ Replacing the FCN with a similarly sized U-Net increases mean AP from 0.25827 to
 The gain from adding a third network is smaller. Mean AP rises from 0.28092 for $P+C$ to 0.28353 for $P+C+S$, at the cost of one extra forward pass. On the four folds evaluated after registering the ensemble, these averages were 0.36723 and 0.37007. On RISCY-FPU-b with seed 43, $P+C$ reached 0.09644 and the ensemble 0.09593, reversing their seed-42 ordering. The two-pass model therefore remains a reasonable choice when inference cost matters.
 
 \subsection{Ranking versus alarms}
-At validation-selected cutoffs the three-model ensemble averages 25.25\% precision and 58.75\% recall, compared with 23.46\% and 53.04\% for the FCN. Its mean F1 is 31.94\%. A hard-negative ranking variant achieved the best F1 of the 21 methods (32.75\%) with AP of only 0.25564. The two metrics answer different design questions: which tiles to inspect first, and what fraction of alarms can be trusted after a cutoff transfers to another circuit.
+At validation-selected cutoffs the three-model ensemble averages 25.24\% precision and 58.75\% recall, compared with 23.46\% and 53.04\% for the FCN. Its mean F1 is 31.94\%. A hard-negative ranking variant achieved the best F1 of the 21 methods (32.75\%) with AP of only 0.25564. The two metrics answer different design questions: which tiles to inspect first, and what fraction of alarms can be trusted after a cutoff transfers to another circuit.
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=0.9\textwidth]{\samplefigure}
-\caption{Held-out RISCY-FPU-a layout 4911. From left: the three placement inputs, the ensemble map, routed overflow, and alarm outcomes. Prediction and truth share a color scale. This layout is the 40th-percentile rank in the eligible within-design sample ordered by ensemble AP.}
+\includegraphics[width=.88\textwidth]{02_4911-RISCY-FPU-a-2-c5-u0.png}\par\smallskip
+\includegraphics[width=.88\textwidth]{02_6590-RISCY-FPU-b-2-c5-u0.png}
+\caption{Held-out predictions for RISCY-FPU-a layout 4911 (top) and RISCY-FPU-b layout 6590 (bottom). Each example occupies the 40th-percentile rank by layout AP within its design's gallery candidate set. Prediction and routed overflow share a color scale. In the detection overlay, teal marks hits, orange marks false alarms, and purple marks missed hotspots.}
 \label{fig:layout}
 \end{figure*}
 
-Figure~\ref{fig:layout} illustrates how the distinction appears in one layout. Ensemble AP is 0.505, up from 0.173 for RUDY. At the transferred cutoff it finds 4,951 of 5,495 true hotspot tiles (90.1\% recall), but flags 21,176 tiles in all (23.4\% precision). The orange false alarms show why a useful ranking can still produce a long inspection list.
+Figure~\ref{fig:layout} shows how differently the validation cutoffs transfer. On layout 4911, ensemble AP is 0.505, up from 0.173 for RUDY. At the transferred cutoff it finds 4,951 of 5,495 true hotspot tiles (90.1\% recall), but flags 21,176 tiles in all (23.4\% precision). On layout 6590, only 224 of 65,536 tiles are true hotspots. The model finds 40 of them among 11,391 flags (17.9\% recall, 0.35\% precision). Its AP of 0.0072 is close to RUDY's 0.0068. The second example illustrates how a sparse layout can yield many false alarms even when its fold has a positive average AP gain over RUDY.
 
 \subsection{Revisiting weighted regression}
 In the early zero-riscy-b FCN pilot (128 training, 32 validation, and 32 test layouts), both checkpoints were selected by validation MAE. Changing $\alpha$ from 0 to 3 shifted test MAE from 0.03082 to 0.03011 and F1 from 0.77\% to 4.62\% at the pilot's fixed cutoff. In a later full-data single-head U-Net validation sweep, the best AP for $\alpha=0,1,3$ was 0.08596, 0.07952, and 0.08239, respectively. Regression weighting thus helped one small-sample operating point. The full-data validation ranking favored ordinary MSE for the single-head baseline. These observations motivated learning a separate hotspot score.
@@ -163,6 +172,7 @@ The CLDRoute release~\cite{thorat2026cldroute} permits a narrower comparison on 
 
 Test hotspot prevalence ranges from 3.27\% to 13.84\% (Table~\ref{tab:design}). Because the AP of an uninformative constant score equals prevalence, part of the raw difference between designs reflects how rare their hotspots are. Repeated layouts of the same circuit provide many test tiles but only six held-out design identities. The designs also share RISC-V families, and the second training seed covers only one circuit. Finally, per-layout normalization removes absolute overflow severity, and our offline evaluation measures neither routed wirelength nor the effect of changing a placement in response to an alarm.
 
+\clearpage
 \section{Conclusion}
 A placement-context U-Net ranks congestion hotspots more accurately than the FCN on average, and a fixed three-model ensemble improves on both the FCN and RUDY in every held-out design. Most of the improvement is available from one context-aware network. The third network gives the best six-design mean AP, with a smaller and seed-sensitive gain over a two-network predictor. For use inside a placer, the remaining question is whether a designer can transfer an alarm threshold with acceptable false-alarm cost, particularly on circuits whose hotspots are sparse.
 

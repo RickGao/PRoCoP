@@ -1,4 +1,10 @@
-# Held-out layout samples
+# PRoCoP figures
+
+## Ensemble architecture
+
+![Placement inputs pass through the Pearson, placement-context and spatial-context U-Nets before fusion.](spatial_consensus_architecture.png)
+
+## Held-out layout samples
 
 24 PNG images, four per circuit design. Each image uses the same 2880 × 1620 layout and shows the three placement inputs, the ensemble prediction, global-routing ground truth, and hotspot detection. Select a layout ID to open the image.
 
